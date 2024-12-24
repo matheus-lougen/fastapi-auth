@@ -23,6 +23,16 @@ def get_users() -> schemas.UserList:
     return {'users': database}
 
 
+@app.get('/users/{user_id}')
+def read_user(user_id: int) -> schemas.StoredUser:
+    if user_id > len(database) or user_id < 1:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
+        )
+
+    return database[user_id - 1]
+
+
 @app.put('/users/{user_id}')
 def put_users(user_id: int, user: schemas.User) -> schemas.StoredUser:
     if user_id > len(database) or user_id < 1:
