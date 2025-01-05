@@ -1,58 +1,79 @@
-from fastapi import FastAPI, HTTPException, status
+from typing import Any
 
-from api import schemas
+from fastapi import Depends, FastAPI, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from api import models, schemas
+from api.database import get_session
 
 app = FastAPI()
 database = []
 
 
-@app.get('/', status_code=status.HTTP_200_OK)
-def root() -> schemas.Message:
+@app.get('/', response_model=schemas.Message, status_code=status.HTTP_200_OK)
+def root() -> Any:
     return {'message': 'Hello World'}
 
 
-@app.post('/users/', status_code=status.HTTP_201_CREATED)
-def post_users(user: schemas.User) -> schemas.StoredUser:
-    new_user = schemas.StoredUser(**user.model_dump(), id=len(database) + 1)
-    database.append(new_user)
-    return new_user
+@app.post('/users/', response_model=schemas.PublicUser, status_code=status.HTTP_201_CREATED)
+def create_user(user: schemas.User, session: Session = Depends(get_session)) -> Any:
+    user = models.User(username=user.username, password=user.password, email=user.email)
 
-
-@app.get('/users/', status_code=status.HTTP_200_OK)
-def get_users() -> schemas.UserList:
-    return {'users': database}
-
-
-@app.get('/users/{user_id}')
-def read_user(user_id: int) -> schemas.StoredUser:
-    if user_id > len(database) or user_id < 1:
+    if user.exists(session):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
+            status_code=status.HTTP_400_BAD_REQUEST, detail='Esse nome de usuário ou e-mail já estão em uso!'
         )
 
-    return database[user_id - 1]
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    return user
 
 
-@app.put('/users/{user_id}')
-def put_users(user_id: int, user: schemas.User) -> schemas.StoredUser:
-    if user_id > len(database) or user_id < 1:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
-        )
-
-    user_with_id = schemas.StoredUser(**user.model_dump(), id=user_id)
-    database[user_id - 1] = user_with_id
-
-    return user_with_id
+@app.get('/users/', response_model=schemas.UserList, status_code=status.HTTP_200_OK)
+def fetch_all_users_from_database(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)) -> Any:
+    users = session.scalars(select(models.User).offset(skip).limit(limit)).all()
+    return {'users': users}
 
 
-@app.delete('/users/{user_id}')
-def delete_user(user_id: int) -> schemas.Message:
-    if user_id > len(database) or user_id < 1:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
-        )
+@app.get('/users/{user_id}', response_model=schemas.PublicUser, status_code=status.HTTP_302_FOUND)
+def fetch_user_from_database(user_id: int, session: Session = Depends(get_session)) -> Any:
+    user = models.User.fetch_by_id(user_id, session)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+    return user
 
-    del database[user_id - 1]
+
+@app.put('/users/{user_id}', response_model=schemas.PublicUser, status_code=status.HTTP_200_OK)
+def update_user_info(user_id: int, user: schemas.User, session: Session = Depends(get_session)) -> Any:
+    stored_user = models.User.fetch_by_id(user_id, session)
+
+    if not stored_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
+    stored_user.username = user.username
+    stored_user.password = user.password
+    stored_user.email = user.email
+
+    try:
+        session.commit()
+        session.refresh(stored_user)
+    except IntegrityError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='This username or email is alreadly in use')
+    return stored_user
+
+
+@app.delete('/users/{user_id}', response_model=schemas.Message, status_code=status.HTTP_200_OK)
+def delete_user_from_database(user_id: int, session: Session = Depends(get_session)) -> schemas.Message:
+    user = models.User.fetch_by_id(user_id, session)
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
+
+    session.delete(user)
+    session.commit()
 
     return {'message': 'User deleted'}

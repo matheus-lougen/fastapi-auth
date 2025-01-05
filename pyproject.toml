@@ -28,7 +28,7 @@ test = 'pytest -s -x --cov=api -vv'
 post_test = 'coverage html'
 
 [tool.ruff]
-line-length = 79
+line-length = 125
 extend-exclude = ['migrations']
 
 [tool.ruff.lint]
