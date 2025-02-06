@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from api import models
+from api import models, security
 from api.app import app
 from api.database import get_session
 from api.models import table_registry
@@ -58,7 +58,9 @@ def mock_db_time():
 
 @pytest.fixture
 def user(session):
-    user = models.User(username='bob', email='bob@example.com', password='mynewpassword')
+    password = 'password123'
+    user = models.User(username='bob', email='bob@example.com', password=security.get_password_hash(password))
+    user.clean_password = password
     session.add(user)
     session.commit()
     session.refresh(user)

@@ -23,5 +23,9 @@ class User:
     def fetch_by_id(cls, id: int, session: Session) -> User:
         return session.scalar(select(User).where(User.id == id))
 
+    @classmethod
+    def fetch_by_email(cls, email: str, session: Session) -> User:
+        return session.scalar(select(User).where(User.email == email))
+
     def exists(self, session: Session) -> bool:
         return session.scalar(exists().where((User.username == self.username) | (User.email == self.email)).select())
