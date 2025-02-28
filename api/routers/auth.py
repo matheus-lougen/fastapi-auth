@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -7,6 +7,8 @@ from api import models, security
 from api.database import Session, get_session
 
 router = APIRouter(prefix='/auth', tags=['auth'])
+Session = Annotated[Session, Depends(get_session)]
+OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
 @router.post('/token', status_code=status.HTTP_200_OK)

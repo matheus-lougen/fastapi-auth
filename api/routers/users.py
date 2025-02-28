@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -8,10 +8,12 @@ from api import models, schemas, security
 from api.database import Session, get_session
 
 router = APIRouter(prefix='/users', tags=['users'])
+Session = Annotated[Session, Depends(get_session)]
+CurrentUser = Annotated[schemas.User, Depends(security.get_current_user)]
 
 
 @router.post('/', response_model=schemas.PublicUser, status_code=status.HTTP_201_CREATED)
-def create_user(user: schemas.User, session: Session = Depends(get_session)) -> Any:
+def create_user(user: schemas.User, session: Session) -> Any:
     user = models.User(username=user.username, password=security.get_password_hash(user.password), email=user.email)
 
     if user.exists(session):
@@ -27,13 +29,13 @@ def create_user(user: schemas.User, session: Session = Depends(get_session)) -> 
 
 
 @router.get('/', response_model=schemas.UserList, status_code=status.HTTP_200_OK)
-def fetch_all_users_from_database(skip: int = 0, limit: int = 100, session: Session = Depends(get_session)) -> Any:
+def fetch_all_users_from_database(session: Session, skip: int = 0, limit: int = 100) -> Any:
     users = session.scalars(select(models.User).offset(skip).limit(limit)).all()
     return {'users': users}
 
 
 @router.get('/{user_id}', response_model=schemas.PublicUser, status_code=status.HTTP_302_FOUND)
-def fetch_user_from_database(user_id: int, session: Session = Depends(get_session)) -> Any:
+def fetch_user_from_database(user_id: int, session: Session) -> Any:
     user = models.User.fetch_by_id(user_id, session)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
@@ -41,12 +43,7 @@ def fetch_user_from_database(user_id: int, session: Session = Depends(get_sessio
 
 
 @router.put('/{user_id}', response_model=schemas.PublicUser, status_code=status.HTTP_200_OK)
-def update_user_info(
-    user_id: int,
-    user: schemas.User,
-    session: Session = Depends(get_session),
-    current_user: models.User = Depends(security.get_current_user),
-) -> Any:
+def update_user_info(user_id: int, user: schemas.User, session: Session, current_user: CurrentUser) -> Any:
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Not enough permissions')
 
@@ -63,9 +60,7 @@ def update_user_info(
 
 
 @router.delete('/{user_id}', response_model=schemas.Message, status_code=status.HTTP_200_OK)
-def delete_user_from_database(
-    user_id: int, session: Session = Depends(get_session), current_user: models.User = Depends(security.get_current_user)
-) -> schemas.Message:
+def delete_user_from_database(user_id: int, session: Session, current_user: CurrentUser) -> schemas.Message:
     if current_user.id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Not enough permissions')
 
