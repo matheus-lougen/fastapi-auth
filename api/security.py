@@ -1,13 +1,45 @@
 from datetime import datetime, timedelta
 
-from jwt import encode
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jwt import DecodeError, decode, encode
 from pwdlib import PasswordHash
+from sqlalchemy.orm import Session
 from zoneinfo import ZoneInfo
+
+from api import models
+from api.database import get_session
 
 SECRET_KEY = 'your-secret-key'
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_content = PasswordHash.recommended()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
+
+
+def get_current_user(session: Session = Depends(get_session), token: str = Depends(oauth2_scheme)) -> models.User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Could not validate credentials',
+        headers={'WWW-Authenticate': 'Bearer'},
+    )
+
+    try:
+        payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        subject_email = payload.get('sub')
+
+        if not subject_email:
+            raise credentials_exception
+
+    except DecodeError:
+        raise credentials_exception
+
+    user = models.User.fetch_by_email(email=subject_email, session=session)
+
+    if not user:
+        raise credentials_exception
+
+    return user
 
 
 def create_access_token(data: dict):

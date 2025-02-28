@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from api import models, schemas, security
 from api.database import get_session
+from api.security import get_current_user
 
 app = FastAPI()
 database = []
@@ -49,32 +50,35 @@ def fetch_user_from_database(user_id: int, session: Session = Depends(get_sessio
 
 
 @app.put('/users/{user_id}', response_model=schemas.PublicUser, status_code=status.HTTP_200_OK)
-def update_user_info(user_id: int, user: schemas.User, session: Session = Depends(get_session)) -> Any:
-    stored_user = models.User.fetch_by_id(user_id, session)
+def update_user_info(
+    user_id: int,
+    user: schemas.User,
+    session: Session = Depends(get_session),
+    current_user: models.User = Depends(get_current_user),
+) -> Any:
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Not enough permissions')
 
-    if not stored_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-
-    stored_user.username = user.username
-    stored_user.password = security.get_password_hash(user.password)
-    stored_user.email = user.email
+    current_user.username = user.username
+    current_user.password = security.get_password_hash(user.password)
+    current_user.email = user.email
 
     try:
         session.commit()
-        session.refresh(stored_user)
+        session.refresh(current_user)
     except IntegrityError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='This username or email is alreadly in use')
-    return stored_user
+    return current_user
 
 
 @app.delete('/users/{user_id}', response_model=schemas.Message, status_code=status.HTTP_200_OK)
-def delete_user_from_database(user_id: int, session: Session = Depends(get_session)) -> schemas.Message:
-    user = models.User.fetch_by_id(user_id, session)
+def delete_user_from_database(
+    user_id: int, session: Session = Depends(get_session), current_user: models.User = Depends(get_current_user)
+) -> schemas.Message:
+    if current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Not enough permissions')
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='User not found')
-
-    session.delete(user)
+    session.delete(current_user)
     session.commit()
 
     return {'message': 'User deleted'}

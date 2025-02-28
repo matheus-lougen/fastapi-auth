@@ -1,6 +1,6 @@
 from fastapi import status
 
-from api import schemas
+from api import schemas, security
 
 
 def test_root_should_return_ok_and_message(client):
@@ -109,7 +109,7 @@ def test_get_user_should_return_ok_and_stored_user(client, user):
     assert response.json() == expected_response_json
 
 
-def test_update_user_should_return_ok_and_stored_user(client, user):
+def test_update_user_should_return_ok_and_stored_user(client, user, token):
     """Test updating the username, email and password of a user that exists.
     `GET https://localhost:8000/users/{user_id}`
     Ensures the HTTP response has a 200 (OK) status code,
@@ -125,30 +125,12 @@ def test_update_user_should_return_ok_and_stored_user(client, user):
         'email': 'john@example.com',
         'id': 1,
     }
-    response = client.put(f'/users/{user.id}', json=request_json)
+    response = client.put(f'/users/{user.id}', headers={'Authorization': f'Bearer {token}'}, json=request_json)
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == expected_response_json
 
 
-def test_update_user_should_return_not_found_and_message(client):
-    """Test updating the username, email and password of a user that doesn't exists.
-    `PUT https://localhost:8000/users/{user_id}`
-    Ensures the HTTP response has a 200 (OK) status code,
-    and the content returned is a JSON object containing the user updated public data.
-    """
-    request_json = {
-        'username': 'bob',
-        'email': 'bob@example.com',
-        'password': 'mynewpassword',
-    }
-    expected_response_json = {'detail': 'User not found'}
-    response = client.put('/users/758923', json=request_json)
-
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json() == expected_response_json
-
-
-def test_update_user_should_return_conflict_and_message(client, user):
+def test_update_user_should_return_conflict_and_message(client, user, token):
     """Test updating the username and email of a user to one that is alreadly in use.
     `PUT https://localhost:8000/users/{user_id}`
     Ensures the HTTP response has a 409 (CONFLICT) status code,
@@ -161,34 +143,34 @@ def test_update_user_should_return_conflict_and_message(client, user):
     }
     expected_response_json = {'detail': 'This username or email is alreadly in use'}
     client.post('/users/', json=request_json)
-    response = client.put(f'/users/{user.id}', json=request_json)
+    response = client.put(f'/users/{user.id}', headers={'Authorization': f'Bearer {token}'}, json=request_json)
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert response.json() == expected_response_json
 
 
-def test_delete_user_should_return_ok_and_message(client, user):
+def test_delete_user_should_return_ok_and_message(client, user, token):
     """Test deleting a user by an id that exists.
     `DELETE https://localhost:8000/users/{user_id}`
     Ensures the HTTP response has a 200 (OK) status code,
     and the content returned is a JSON object containing a confirmation message.
     """
-    response = client.delete('/users/1')
+    response = client.delete('/users/1', headers={'Authorization': f'Bearer {token}'})
 
     assert response.status_code == status.HTTP_200_OK
     assert response.json() == {'message': 'User deleted'}
 
 
-def test_delete_user_should_return_not_found(client):
-    """Test deleting a user by an id that doesn't exists.
+def test_delete_user_while_not_authoritzed(client):
+    """Test deleting a user without authorized.
     `DELETE https://localhost:8000/users/{user_id}`
-    Ensures the HTTP response has a 400 (NOT FOUND) status code,
+    Ensures the HTTP response has a 401 (UNAUTHORIZED) status code,
     and the content returned is a JSON object containing a error message.
     """
     response = client.delete('/users/8260382490')
 
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json() == {'detail': 'User not found'}
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {'detail': 'Not authenticated'}
 
 
 def test_generate_access_token_should_return_ok(client, user):
@@ -210,3 +192,29 @@ def test_generate_access_token_should_return_incorret_email(client, user):
     response = client.post('/token/', data={'username': 'kpaula2101@gmail.com', 'password': user.clean_password})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_delete_user_using_token_with_invalid_email(client):
+    data = {'no-email': 'test'}
+    token = security.create_access_token(data)
+
+    response = client.delete(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {'detail': 'Could not validate credentials'}
+
+
+def test_delete_user_using_token_with_a_email_that_dont_exists(client):
+    data = {'sub': 'test@test'}
+    token = security.create_access_token(data)
+
+    response = client.delete(
+        '/users/1',
+        headers={'Authorization': f'Bearer {token}'},
+    )
+
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert response.json() == {'detail': 'Could not validate credentials'}
