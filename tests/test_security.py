@@ -21,9 +21,7 @@ def test_password_hash():
 
 
 def test_jwt_invalid_token(client):
-    response = client.delete(
-        '/users/1', headers={'Authorization': 'Bearer token-invalido'}
-    )
+    response = client.delete('/users/1', headers={'Authorization': 'Bearer token-invalido'})
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {'detail': 'Could not validate credentials'}
