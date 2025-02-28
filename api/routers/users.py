@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, IntegrityError, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from api import models, schemas, security
 from api.database import Session, get_session
