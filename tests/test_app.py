@@ -174,7 +174,7 @@ def test_delete_user_while_not_authoritzed(client):
 
 
 def test_generate_access_token_should_return_ok(client, user):
-    response = client.post('/token/', data={'username': user.email, 'password': user.clean_password})
+    response = client.post('/auth/token', data={'username': user.email, 'password': user.clean_password})
     token = response.json()
 
     assert response.status_code == status.HTTP_200_OK
@@ -183,13 +183,13 @@ def test_generate_access_token_should_return_ok(client, user):
 
 
 def test_generate_access_token_should_return_incorret_password(client, user):
-    response = client.post('/token/', data={'username': user.email, 'password': 'wrongpassword'})
+    response = client.post('/auth/token', data={'username': user.email, 'password': 'wrongpassword'})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
 def test_generate_access_token_should_return_incorret_email(client, user):
-    response = client.post('/token/', data={'username': 'kpaula2101@gmail.com', 'password': user.clean_password})
+    response = client.post('/auth/token/', data={'username': 'kpaula2101@gmail.com', 'password': user.clean_password})
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 

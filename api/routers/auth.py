@@ -9,7 +9,7 @@ from api.database import Session, get_session
 router = APIRouter('/auth', tags=['auth'])
 
 
-@router.post('/token/', status_code=status.HTTP_200_OK)
+@router.post('/token', status_code=status.HTTP_200_OK)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)) -> Any:
     user = models.User.fetch_by_email(form_data.username, session)
 
@@ -22,3 +22,4 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), ses
     access_token = security.create_access_token(data={'sub': user.email})
 
     return {'access_token': access_token, 'token_type': 'bearer'}
+ 
