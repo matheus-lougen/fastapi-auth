@@ -12,7 +12,7 @@ OAuth2Form = Annotated[OAuth2PasswordRequestForm, Depends()]
 
 
 @router.post('/token', status_code=status.HTTP_200_OK)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)) -> Any:
+def login_for_access_token(form_data: OAuth2Form, session: Session) -> Any:
     user = models.User.fetch_by_email(form_data.username, session)
 
     if not user:

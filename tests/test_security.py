@@ -2,13 +2,16 @@ import jwt
 from fastapi import status
 
 from api import security
+from api.settings import Settings
+
+settings = Settings()
 
 
 def test_jwt():
     data = {'test': 'test'}
     token = security.create_access_token(data)
 
-    decoded = jwt.decode(token, security.SECRET_KEY, algorithms=['HS256'])
+    decoded = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
     assert decoded['test'] == data['test']
     assert 'exp' in decoded
