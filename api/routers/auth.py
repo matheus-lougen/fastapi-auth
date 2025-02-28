@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from api import models, security
 from api.database import Session, get_session
 
-router = APIRouter('/auth', tags=['auth'])
+router = APIRouter(prefix='/auth', tags=['auth'])
 
 
 @router.post('/token', status_code=status.HTTP_200_OK)
