@@ -1,5 +1,9 @@
 # Fast API Auth
 
+## To-do list:
+- Add rate limits
+- Logging
+
 Activate virtual enviroment
 ```shell
 poetry shell

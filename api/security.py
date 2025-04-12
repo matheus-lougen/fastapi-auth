@@ -4,11 +4,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt import DecodeError, decode, encode
 from pwdlib import PasswordHash
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from zoneinfo import ZoneInfo
 
-from api import models
-from api.database import get_session
+from api import database, models
 from api.settings import Settings
 
 pwd_content = PasswordHash.recommended()
@@ -16,7 +16,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/auth/token')
 settings = Settings()
 
 
-def get_current_user(session: Session = Depends(get_session), token: str = Depends(oauth2_scheme)) -> models.User:
+async def get_current_user(
+    session: AsyncSession = Depends(database.get_session), token: str = Depends(oauth2_scheme)
+) -> models.User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Could not validate credentials',
@@ -33,7 +35,7 @@ def get_current_user(session: Session = Depends(get_session), token: str = Depen
     except DecodeError:
         raise credentials_exception
 
-    user = models.User.fetch_by_email(email=subject_email, session=session)
+    user = await session.scalar(select(models.User).where(models.User.email == subject_email))
 
     if not user:
         raise credentials_exception

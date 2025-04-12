@@ -3,7 +3,7 @@ from fastapi import status
 from api import schemas, security
 
 
-def test_create_user_should_return_created_and_public_user_data(client):
+def create_new_user_should_return_created_and_public_user_json(client):
     """Tests creating a new user in the application.
     `POST https://localhost:8000/users/`
     Ensures the HTTP response has a 201 (CREATED) status code,
@@ -117,6 +117,23 @@ def test_update_user_should_return_ok_and_stored_user(client, user, token):
     assert response.json() == expected_response_json
 
 
+def test_update_user_while_not_authorized(client, user, token):
+    """Test updating the email of a user while not authorized to do so.
+    `GET https://localhost:8000/users/{user_id}`
+    Ensures the HTTP response has a 200 (OK) status code,
+    and the content returned is a JSON object containing the user updated public data.
+    """
+    request_json = {
+        'username': 'john',
+        'email': 'john@example.com',
+        'password': 'johnnewpassword',
+    }
+    expected_response_json = {'detail': 'Not enough permissions'}
+    response = client.put('/users/9999', headers={'Authorization': f'Bearer {token}'}, json=request_json)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == expected_response_json
+
+
 def test_update_user_should_return_conflict_and_message(client, user, token):
     """Test updating the username and email of a user to one that is alreadly in use.
     `PUT https://localhost:8000/users/{user_id}`
@@ -148,7 +165,19 @@ def test_delete_user_should_return_ok_and_message(client, user, token):
     assert response.json() == {'message': 'User deleted'}
 
 
-def test_delete_user_while_not_authoritzed(client):
+def test_delete_user_while_not_authorized(client, user, token):
+    """Test deleting a user without authorized.
+    `DELETE https://localhost:8000/users/{user_id}`
+    Ensures the HTTP response has a 401 (UNAUTHORIZED) status code,
+    and the content returned is a JSON object containing a error message.
+    """
+    response = client.delete('/users/8260382490', headers={'Authorization': f'Bearer {token}'})
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == {'detail': 'Not enough permissions'}
+
+
+def test_delete_user_while_not_authenticated(client):
     """Test deleting a user without authorized.
     `DELETE https://localhost:8000/users/{user_id}`
     Ensures the HTTP response has a 401 (UNAUTHORIZED) status code,
